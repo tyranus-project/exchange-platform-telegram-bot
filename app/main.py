@@ -2,11 +2,13 @@ from aiogram import Bot, Dispatcher, executor, types
 from aiogram.contrib.fsm_storage.memory import MemoryStorage
 
 from app.config import BOT_TOKEN
+from app.handlers.default import register_default_handlers
 from app.utils.set_bot_commands import set_default_commands
 
 
 async def on_startup(dp: Dispatcher):
     await set_default_commands(dp)
+    register_default_handlers(dp)
 
 
 if __name__ == '__main__':
