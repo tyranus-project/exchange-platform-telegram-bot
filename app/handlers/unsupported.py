@@ -8,5 +8,5 @@ async def undefined_request(message: types.Message):
     )
 
 
-def register_default_handlers(dp: Dispatcher):
+def register_unsupported_handlers(dp: Dispatcher):
     dp.register_message_handler(undefined_request, content_types=ContentType.ANY, state="*")
