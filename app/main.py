@@ -4,12 +4,14 @@ from aiogram.contrib.fsm_storage.memory import MemoryStorage
 from loguru import logger
 
 from app.config import BOT_TOKEN
+from app.handlers.default import register_default_handlers
 from app.handlers.unsupported import register_unsupported_handlers
 from app.utils.set_bot_commands import set_default_commands
 
 
 async def on_startup(dp: Dispatcher):
     await set_default_commands(dp)
+    register_default_handlers(dp)
     register_unsupported_handlers(dp)
     logger.info("Exchange platform bot launched!")
 
