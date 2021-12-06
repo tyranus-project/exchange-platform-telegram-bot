@@ -3,12 +3,13 @@ from aiogram import Dispatcher, executor
 from loguru import logger
 
 from app import handlers
-from app.loader import exchange_platform_dispatcher
+from app.loader import exchange_platform_dispatcher, db
 from app.utils.set_bot_commands import set_default_commands
 
 
 async def on_startup(dp: Dispatcher):
     handlers.setup_handlers(dp)
+    await db.create_database()
     await set_default_commands(dp)
     logger.info("Exchange platform bot launched!")
 
@@ -16,6 +17,7 @@ async def on_startup(dp: Dispatcher):
 async def on_shutdown(dp: Dispatcher):
     logger.info("Shutting down...")
     # await dp.bot.session.close()
+    await db.close_database()
     await dp.storage.close()
     await dp.storage.wait_closed()
     logger.info("Exchange platform bot finished!")
