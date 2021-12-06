@@ -1,6 +1,8 @@
 import asyncio
 import asyncpg
 
+from loguru import logger
+
 
 class Database:
 
@@ -22,3 +24,11 @@ class Database:
 
     async def close_database(self) -> None:
         await self.pool.close()
+
+    async def add_user(self, user_id: int, user_lang: str) -> None:
+        await self.pool.execute(f"INSERT INTO Users VALUES({user_id}, '{user_lang}')")
+        logger.info(f"New user - user_id: {user_id}; language: {user_lang}")
+
+    async def verification(self, user_id: int) -> bool:
+        response = await self.pool.fetchrow(f"SELECT user_id FROM Users WHERE user_id={user_id}")
+        return True if response else False
