@@ -1,0 +1,28 @@
+version: "3.8"
+
+services:
+
+  redis:
+    container_name: redis-bot
+    image: redis:5-alpine
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - ${REDIS_PORT}:${REDIS_PORT}
+    volumes:
+      - redis-data:/data
+
+  exchange-platform:
+    container_name: exchange-platform-bot
+    build: .
+    restart: always
+    env_file:
+      - .env
+    environment:
+      - REDIS_HOST=redis
+    depends_on:
+      - redis
+
+volumes:
+  redis-data:
