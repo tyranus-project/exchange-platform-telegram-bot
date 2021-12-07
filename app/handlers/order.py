@@ -5,12 +5,16 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 
 from loguru import logger
 
-from app.keyboards.inline import call_order_data_keyboard
+from app.keyboards.inline import call_order_data_keyboard, call_order_categories_keyboard
+
+
+order_categories = ["Information", "Documents", "Photos", "Videos", "Location", "Other"]
 
 
 class CreateOrder(StatesGroup):
     waiting_for_order_data = State()
     waiting_for_order_name = State()
+    waiting_for_order_category = State()
     waiting_for_short_description = State()
     waiting_for_price = State()
     waiting_for_address = State()
@@ -42,6 +46,25 @@ async def enter_order_name(message: types.Message, state: FSMContext):
         return
     await state.update_data(name=message.text)
     await setup_order_data(message, state)
+
+
+async def order_category_button(callback: types.CallbackQuery):
+    await callback.message.edit_text(f"Select the category for the order")
+    await callback.message.edit_reply_markup(call_order_categories_keyboard(order_categories))
+    await CreateOrder.waiting_for_order_category.set()
+
+
+async def enter_order_category(callback: types.CallbackQuery, state: FSMContext):
+    category_name = callback.data.split('_')[1]
+    await state.update_data(category=category_name)
+    await callback.message.edit_text(f"Selected category: {category_name}")
+    # await callback.message.delete()
+    await setup_order_data(callback.message, state)
+
+
+async def back_setup_order_data(callback: types.CallbackQuery, state: FSMContext):
+    await callback.message.delete()
+    await setup_order_data(callback.message, state)
 
 
 async def order_short_description_button(callback: types.CallbackQuery):
@@ -93,6 +116,9 @@ def register_order_handlers(dp: Dispatcher):
     dp.register_message_handler(setup_order_data, Text(equals="Create order", ignore_case=True))
     dp.register_callback_query_handler(order_name_button, Text(equals="name"), state=CreateOrder.waiting_for_order_data)
     dp.register_message_handler(enter_order_name, state=CreateOrder.waiting_for_order_name)
+    dp.register_callback_query_handler(order_category_button, Text(equals="categories"), state=CreateOrder.waiting_for_order_data)
+    dp.register_callback_query_handler(enter_order_category, Text(startswith="category"), state=CreateOrder.waiting_for_order_category)
+    dp.register_callback_query_handler(back_setup_order_data, Text(equals="back_order_data_keyboard"), state=CreateOrder.waiting_for_order_category)
     dp.register_callback_query_handler(order_short_description_button, Text(equals="short_description"), state=CreateOrder.waiting_for_order_data)
     dp.register_message_handler(enter_short_description, state=CreateOrder.waiting_for_short_description)
     dp.register_callback_query_handler(order_price_button, Text(equals="price"), state=CreateOrder.waiting_for_order_data)
