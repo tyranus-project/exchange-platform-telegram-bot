@@ -6,6 +6,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 from loguru import logger
 
 from app.keyboards.inline import call_order_data_keyboard, call_order_categories_keyboard
+from app.loader import db
 
 
 order_categories = ["Information", "Documents", "Photos", "Videos", "Location", "Other"]
@@ -106,8 +107,16 @@ async def enter_address(message: types.Message, state: FSMContext):
 
 
 async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMContext):
-    # order_data = await state.get_data()
-    # logger.info(f"{order_data}")
+    order_data = await state.get_data()
+    if len(order_data) != 5:
+        await callback.message.edit_text(
+            "Not all order data has been entered.\n"
+            "Add missing by clicking on the buttons:",
+            reply_markup=call_order_data_keyboard(**order_data)
+        )
+        return
+    logger.info(f"{order_data}")
+    await db.add_order(callback.from_user.id, **order_data)
     await callback.message.edit_text("Finished")
     await state.reset_state()
 

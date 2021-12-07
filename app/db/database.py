@@ -32,3 +32,11 @@ class Database:
     async def verification(self, user_id: int) -> bool:
         response = await self.pool.fetchrow(f"SELECT user_id FROM Users WHERE user_id={user_id}")
         return True if response else False
+
+    async def add_order(self, user_id: int, name: str, category: str, short_description: str, price: str, address: str) -> None:
+        await self.pool.execute(
+            '''
+            INSERT INTO Orders(user_id, name, category, short_description, price, address)
+            VALUES($1, $2, $3, $4, $5, $6)
+            ''', user_id, name, category, short_description, price, address)
+        logger.info(f"New order - user_id: {user_id}; order name: {name}")
