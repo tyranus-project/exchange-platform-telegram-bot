@@ -33,10 +33,12 @@ class Database:
         response = await self.pool.fetchrow(f"SELECT user_id FROM Users WHERE user_id={user_id}")
         return True if response else False
 
-    async def add_order(self, user_id: int, name: str, category: str, short_description: str, price: str, address: str) -> None:
+    async def add_order(
+            self, user_id: int, name: str, category: str, short_description: str, price: str, address: str, message: list = None
+    ) -> None:
         await self.pool.execute(
             '''
-            INSERT INTO Orders(user_id, name, category, short_description, price, address)
-            VALUES($1, $2, $3, $4, $5, $6)
-            ''', user_id, name, category, short_description, price, address)
+            INSERT INTO Orders(user_id, name, category, short_description, price, address, message)
+            VALUES($1, $2, $3, $4, $5, $6, $7)
+            ''', user_id, name, category, short_description, price, address, message)
         logger.info(f"New order - user_id: {user_id}; order name: {name}")

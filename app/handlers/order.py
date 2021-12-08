@@ -5,7 +5,7 @@ from aiogram.dispatcher.filters.state import State, StatesGroup
 
 from loguru import logger
 
-from app.keyboards.inline import call_order_data_keyboard, call_order_categories_keyboard
+from app.keyboards.inline import call_order_data_keyboard, call_order_categories_keyboard, order_content_keyboard
 from app.loader import db
 
 
@@ -19,10 +19,13 @@ class CreateOrder(StatesGroup):
     waiting_for_short_description = State()
     waiting_for_price = State()
     waiting_for_address = State()
+    waiting_for_content = State()
+    waiting_for_content_message = State()
 
 
 async def setup_order_data(message: types.Message, state: FSMContext):
     if await state.get_state() is None:
+        await state.update_data(message=[])
         await message.answer("Welcome message")
     current_data = await state.get_data()
     await message.answer(
@@ -106,19 +109,45 @@ async def enter_address(message: types.Message, state: FSMContext):
     await setup_order_data(message, state)
 
 
+async def order_content_button(callback: types.CallbackQuery, state):
+    current_data = await state.get_data()
+    await callback.message.edit_text(f"Number of messages: {len(current_data['message'])}")
+    await callback.message.edit_reply_markup(order_content_keyboard)
+    await CreateOrder.waiting_for_content.set()
+
+
+async def order_message_button(callback: types.CallbackQuery):
+    await callback.message.edit_text(f"Add a comment for the order or the information itself that you want to sell")
+    await CreateOrder.waiting_for_content_message.set()
+
+
+async def enter_message(message: types.Message, state: FSMContext):
+    if len(message.text) == 4096:
+        await message.reply("Please note that this message will be added")
+    current_data = await state.get_data()
+    current_data["message"] += [message.text]
+    await state.update_data(message=current_data["message"])
+    await message.answer(
+        f"Number of messages: {len(current_data['message'])}",
+        reply_markup=order_content_keyboard
+    )
+    await CreateOrder.waiting_for_content.set()
+
+
 async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMContext):
     order_data = await state.get_data()
-    if len(order_data) != 5:
+    if len(order_data) == 6 and order_data["message"]:
+        # logger.info(f"{order_data}")
+        await db.add_order(callback.from_user.id, **order_data)
+        await callback.message.edit_text("Finished")
+        await state.reset_state()
+    else:
         await callback.message.edit_text(
             "Not all order data has been entered.\n"
             "Add missing by clicking on the buttons:",
             reply_markup=call_order_data_keyboard(**order_data)
         )
         return
-    logger.info(f"{order_data}")
-    await db.add_order(callback.from_user.id, **order_data)
-    await callback.message.edit_text("Finished")
-    await state.reset_state()
 
 
 def register_order_handlers(dp: Dispatcher):
@@ -127,11 +156,16 @@ def register_order_handlers(dp: Dispatcher):
     dp.register_message_handler(enter_order_name, state=CreateOrder.waiting_for_order_name)
     dp.register_callback_query_handler(order_category_button, Text(equals="categories"), state=CreateOrder.waiting_for_order_data)
     dp.register_callback_query_handler(enter_order_category, Text(startswith="category"), state=CreateOrder.waiting_for_order_category)
-    dp.register_callback_query_handler(back_setup_order_data, Text(equals="back_order_data_keyboard"), state=CreateOrder.waiting_for_order_category)
+    dp.register_callback_query_handler(back_setup_order_data, Text(equals="back_order_data_keyboard"), state=CreateOrder.states_names)
     dp.register_callback_query_handler(order_short_description_button, Text(equals="short_description"), state=CreateOrder.waiting_for_order_data)
     dp.register_message_handler(enter_short_description, state=CreateOrder.waiting_for_short_description)
     dp.register_callback_query_handler(order_price_button, Text(equals="price"), state=CreateOrder.waiting_for_order_data)
     dp.register_message_handler(enter_price, state=CreateOrder.waiting_for_price)
     dp.register_callback_query_handler(order_address_button, Text(equals="address"), state=CreateOrder.waiting_for_order_data)
     dp.register_message_handler(enter_address, state=CreateOrder.waiting_for_address)
+
+    dp.register_callback_query_handler(order_content_button, Text(equals="content"), state=CreateOrder.waiting_for_order_data)
+    dp.register_callback_query_handler(order_message_button, Text(equals="message"), state=CreateOrder.waiting_for_content)
+    dp.register_message_handler(enter_message, state=CreateOrder.waiting_for_content_message)
+
     dp.register_callback_query_handler(finish_order_data_setup, Text(equals="save_order_data"), state=CreateOrder.waiting_for_order_data)

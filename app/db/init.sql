@@ -11,5 +11,6 @@ CREATE TABLE IF NOT EXISTS Orders(
     category TEXT NOT NULL,
     short_description TEXT NOT NULL,
     price TEXT NOT NULL,
-    address TEXT NOT NULL
+    address TEXT NOT NULL,
+    message TEXT[] NOT NULL
 );
