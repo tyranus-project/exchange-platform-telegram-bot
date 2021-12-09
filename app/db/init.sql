@@ -12,5 +12,6 @@ CREATE TABLE IF NOT EXISTS Orders(
     short_description TEXT NOT NULL,
     price TEXT NOT NULL,
     address TEXT NOT NULL,
-    message TEXT[] NOT NULL
+    message TEXT[] NOT NULL,
+    photo TEXT[] NOT NULL
 );

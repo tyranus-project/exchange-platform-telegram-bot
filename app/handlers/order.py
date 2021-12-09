@@ -2,6 +2,7 @@ from aiogram import Dispatcher, types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
+from aiogram.types.message import ContentType
 
 from loguru import logger
 
@@ -21,11 +22,12 @@ class CreateOrder(StatesGroup):
     waiting_for_address = State()
     waiting_for_content = State()
     waiting_for_content_message = State()
+    waiting_for_content_photo = State()
 
 
 async def setup_order_data(message: types.Message, state: FSMContext):
     if await state.get_state() is None:
-        await state.update_data(message=[])
+        await state.update_data(message=[], photo=[])
         await message.answer("Welcome message")
     current_data = await state.get_data()
     await message.answer(
@@ -134,13 +136,37 @@ async def enter_message(message: types.Message, state: FSMContext):
     await CreateOrder.waiting_for_content.set()
 
 
+async def order_photo_button(callback: types.CallbackQuery):
+    await callback.message.edit_text(f"Add photo")
+    await CreateOrder.waiting_for_content_photo.set()
+
+
+async def enter_photo(message: types.Message, state: FSMContext):
+    if message.content_type != "photo":
+        await message.answer("You must send photo. Try again!")
+        return
+    current_data = await state.get_data()
+    current_data["photo"] += [message.photo[-1].file_id]
+    await state.update_data(photo=current_data["photo"])
+    await message.answer(
+        f"Number of messages: {len(current_data['message'])}\n"
+        f"Number of photos: {len(current_data['photo'])}",
+        reply_markup=order_content_keyboard
+    )
+    await CreateOrder.waiting_for_content.set()
+
+
 async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMContext):
     order_data = await state.get_data()
-    if len(order_data) == 6 and order_data["message"]:
+    if len(order_data) == 7 and (order_data["message"] or order_data["photo"]):
         # logger.info(f"{order_data}")
         await db.add_order(callback.from_user.id, **order_data)
         await callback.message.edit_text("Finished")
+        if order_data["photo"]:
+            for photo_id in order_data["photo"]:
+                await callback.message.answer_photo(photo_id)
         await state.reset_state()
+        logger.info(await db.get_order(1))
     else:
         await callback.message.edit_text(
             "Not all order data has been entered.\n"
@@ -167,5 +193,8 @@ def register_order_handlers(dp: Dispatcher):
     dp.register_callback_query_handler(order_content_button, Text(equals="content"), state=CreateOrder.waiting_for_order_data)
     dp.register_callback_query_handler(order_message_button, Text(equals="message"), state=CreateOrder.waiting_for_content)
     dp.register_message_handler(enter_message, state=CreateOrder.waiting_for_content_message)
+
+    dp.register_callback_query_handler(order_photo_button, Text(equals="photo"), state=CreateOrder.waiting_for_content)
+    dp.register_message_handler(enter_photo, content_types=ContentType.ANY, state=CreateOrder.waiting_for_content_photo)
 
     dp.register_callback_query_handler(finish_order_data_setup, Text(equals="save_order_data"), state=CreateOrder.waiting_for_order_data)
