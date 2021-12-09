@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS Orders(
     date_time DATE DEFAULT CURRENT_DATE,
     name TEXT NOT NULL,
     category TEXT NOT NULL,
-    short_description TEXT NOT NULL,
+    description TEXT NOT NULL,
     price TEXT NOT NULL,
     address TEXT NOT NULL,
     message TEXT[] NOT NULL,
