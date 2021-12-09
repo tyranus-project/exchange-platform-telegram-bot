@@ -15,5 +15,6 @@ CREATE TABLE IF NOT EXISTS Orders(
     message TEXT[] NOT NULL,
     photo TEXT[] NOT NULL,
     video TEXT[] NOT NULL,
-    audio TEXT[] NOT NULL
+    audio TEXT[] NOT NULL,
+    document TEXT[] NOT NULL
 );

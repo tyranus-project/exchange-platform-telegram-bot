@@ -25,11 +25,12 @@ class CreateOrder(StatesGroup):
     waiting_for_content_photo = State()
     waiting_for_content_video = State()
     waiting_for_content_audio = State()
+    waiting_for_content_document = State()
 
 
 async def setup_order_data(message: types.Message, state: FSMContext):
     if await state.get_state() is None:
-        await state.update_data(message=[], photo=[], video=[], audio=[])
+        await state.update_data(message=[], photo=[], video=[], audio=[], document=[])
         await message.answer("Welcome message")
     current_data = await state.get_data()
     await message.answer(
@@ -201,17 +202,40 @@ async def enter_audio(message: types.Message, state: FSMContext):
     await CreateOrder.waiting_for_content.set()
 
 
+async def order_document_document(callback: types.CallbackQuery):
+    await callback.message.edit_text(f"Add document")
+    await CreateOrder.waiting_for_content_document.set()
+
+
+async def enter_document(message: types.Message, state: FSMContext):
+    if message.content_type != "document":
+        await message.answer("You must send document. Try again!")
+        return
+    current_data = await state.get_data()
+    current_data["document"] += [message.document.file_id]
+    await state.update_data(document=current_data["document"])
+    await message.answer(
+        f"Number of messages: {len(current_data['message'])}\n"
+        f"Number of photos: {len(current_data['photo'])}\n"
+        f"Number of videos: {len(current_data['video'])}\n"
+        f"Number of audios: {len(current_data['audio'])}\n"
+        f"Number of documents: {len(current_data['document'])}",
+        reply_markup=order_content_keyboard
+    )
+    await CreateOrder.waiting_for_content.set()
+
+
 async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMContext):
     order_data = await state.get_data()
-    if len(order_data) == 9 and (
-            order_data["message"] or order_data["photo"] or order_data["video"] or order_data["audio"]
+    if len(order_data) == 10 and (
+            order_data["message"] or order_data["photo"] or order_data["video"] or order_data["audio"] or order_data["document"]
     ):
         # logger.info(f"{order_data}")
         await db.add_order(callback.from_user.id, **order_data)
         await callback.message.edit_text("Finished")
-        if order_data["audio"]:
-            for audio_id in order_data["audio"]:
-                await callback.message.answer_audio(audio_id)
+        if order_data["document"]:
+            for document_id in order_data["document"]:
+                await callback.message.answer_document(document_id)
         await state.reset_state()
         logger.info(await db.get_order(1))
     else:
@@ -249,5 +273,8 @@ def register_order_handlers(dp: Dispatcher):
 
     dp.register_callback_query_handler(order_audio_button, Text(equals="audio"), state=CreateOrder.waiting_for_content)
     dp.register_message_handler(enter_audio, content_types=ContentType.ANY, state=CreateOrder.waiting_for_content_audio)
+
+    dp.register_callback_query_handler(order_document_document, Text(equals="document"), state=CreateOrder.waiting_for_content)
+    dp.register_message_handler(enter_document, content_types=ContentType.ANY, state=CreateOrder.waiting_for_content_document)
 
     dp.register_callback_query_handler(finish_order_data_setup, Text(equals="save_order_data"), state=CreateOrder.waiting_for_order_data)
