@@ -23,11 +23,12 @@ class CreateOrder(StatesGroup):
     waiting_for_content = State()
     waiting_for_content_message = State()
     waiting_for_content_photo = State()
+    waiting_for_content_video = State()
 
 
 async def setup_order_data(message: types.Message, state: FSMContext):
     if await state.get_state() is None:
-        await state.update_data(message=[], photo=[])
+        await state.update_data(message=[], photo=[], video=[])
         await message.answer("Welcome message")
     current_data = await state.get_data()
     await message.answer(
@@ -156,15 +157,36 @@ async def enter_photo(message: types.Message, state: FSMContext):
     await CreateOrder.waiting_for_content.set()
 
 
+async def order_video_button(callback: types.CallbackQuery):
+    await callback.message.edit_text(f"Add video")
+    await CreateOrder.waiting_for_content_video.set()
+
+
+async def enter_video(message: types.Message, state: FSMContext):
+    if message.content_type != "video":
+        await message.answer("You must send video. Try again!")
+        return
+    current_data = await state.get_data()
+    current_data["video"] += [message.video.file_id]
+    await state.update_data(video=current_data["video"])
+    await message.answer(
+        f"Number of messages: {len(current_data['message'])}\n"
+        f"Number of photos: {len(current_data['photo'])}\n"
+        f"Number of videos: {len(current_data['video'])}",
+        reply_markup=order_content_keyboard
+    )
+    await CreateOrder.waiting_for_content.set()
+
+
 async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMContext):
     order_data = await state.get_data()
-    if len(order_data) == 7 and (order_data["message"] or order_data["photo"]):
+    if len(order_data) == 8 and (order_data["message"] or order_data["photo"] or order_data["video"]):
         # logger.info(f"{order_data}")
         await db.add_order(callback.from_user.id, **order_data)
         await callback.message.edit_text("Finished")
-        if order_data["photo"]:
-            for photo_id in order_data["photo"]:
-                await callback.message.answer_photo(photo_id)
+        if order_data["video"]:
+            for video_id in order_data["video"]:
+                await callback.message.answer_video(video_id)
         await state.reset_state()
         logger.info(await db.get_order(1))
     else:
@@ -196,5 +218,8 @@ def register_order_handlers(dp: Dispatcher):
 
     dp.register_callback_query_handler(order_photo_button, Text(equals="photo"), state=CreateOrder.waiting_for_content)
     dp.register_message_handler(enter_photo, content_types=ContentType.ANY, state=CreateOrder.waiting_for_content_photo)
+
+    dp.register_callback_query_handler(order_video_button, Text(equals="video"), state=CreateOrder.waiting_for_content)
+    dp.register_message_handler(enter_video, content_types=ContentType.ANY, state=CreateOrder.waiting_for_content_video)
 
     dp.register_callback_query_handler(finish_order_data_setup, Text(equals="save_order_data"), state=CreateOrder.waiting_for_order_data)

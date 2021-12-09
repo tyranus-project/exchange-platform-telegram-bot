@@ -42,13 +42,14 @@ class Database:
             price: str,
             address: str,
             message: list = None,
-            photo: list = None
+            photo: list = None,
+            video: list = None
     ) -> None:
         await self.pool.execute(
             '''
-            INSERT INTO Orders(user_id, name, category, short_description, price, address, message, photo)
-            VALUES($1, $2, $3, $4, $5, $6, $7, $8)
-            ''', user_id, name, category, short_description, price, address, message, photo)
+            INSERT INTO Orders(user_id, name, category, short_description, price, address, message, photo, video)
+            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ''', user_id, name, category, short_description, price, address, message, photo, video)
         logger.info(f"New order - user_id: {user_id}; order name: {name}")
 
     async def get_order(self, order_id: int):
