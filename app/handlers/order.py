@@ -9,7 +9,6 @@ from loguru import logger
 from app.keyboards.inline import call_setup_order_keyboard, call_order_categories_keyboard, order_content_keyboard
 from app.loader import db
 
-
 order_categories = ["Information", "Documents", "Photos", "Videos", "Location", "Other"]
 
 
@@ -112,17 +111,44 @@ async def enter_address(message: types.Message, state: FSMContext):
     await setup_order(message, state)
 
 
-async def add_content(callback: types.CallbackQuery, state):
+async def add_content(callback: types.CallbackQuery, state: FSMContext):
     current_data = await state.get_data()
     await callback.message.edit_text(
-        f"Number of messages: {len(current_data['message'])}\n"
-        f"Number of photos: {len(current_data['photo'])}\n"
-        f"Number of videos: {len(current_data['video'])}\n"
-        f"Number of audios: {len(current_data['audio'])}\n"
-        f"Number of documents: {len(current_data['document'])}",
+        "\n".join(
+            f"Number of {content_type}s: {len(current_data[content_type])}"
+            for content_type in ["message", "photo", "video", "audio", "document"]
+        ),
+        reply_markup=order_content_keyboard
     )
-    await callback.message.edit_reply_markup(order_content_keyboard)
     await CreateOrder.content.set()
+
+
+async def enter_content(content_type: str, message: types.Message, state: FSMContext) -> None:
+    if message.content_type != content_type:
+        await message.answer(f"You must send {content_type}. Try again!")
+    else:
+        current_data = await state.get_data()
+        if content_type == "text":
+            if len(message.text) == 4096:
+                await message.reply("Please note that this message will be added")
+            current_data["message"] += [message.text]
+        elif content_type == "photo":
+            current_data["photo"] += [message.photo[-1].file_id]
+        elif content_type == "video":
+            current_data["video"] += [message.video.file_id]
+        elif content_type == "audio":
+            current_data["audio"] += [message.audio.file_id]
+        elif content_type == "document":
+            current_data["document"] += [message.document.file_id]
+        await state.update_data(current_data)
+        await message.answer(
+            "\n".join(
+                f"Number of {content_type}s: {len(current_data[content_type])}"
+                for content_type in ["message", "photo", "video", "audio", "document"]
+            ),
+            reply_markup=order_content_keyboard
+        )
+        await state.set_state(CreateOrder.content.state)
 
 
 async def add_message(callback: types.CallbackQuery):
@@ -131,23 +157,7 @@ async def add_message(callback: types.CallbackQuery):
 
 
 async def enter_message(message: types.Message, state: FSMContext):
-    if message.content_type != "text":
-        await message.answer("You must send text. Try again!")
-        return
-    if len(message.text) == 4096:
-        await message.reply("Please note that this message will be added")
-    current_data = await state.get_data()
-    current_data["message"] += [message.text]
-    await state.update_data(message=current_data["message"])
-    await message.answer(
-        f"Number of messages: {len(current_data['message'])}\n"
-        f"Number of photos: {len(current_data['photo'])}\n"
-        f"Number of videos: {len(current_data['video'])}\n"
-        f"Number of audios: {len(current_data['audio'])}\n"
-        f"Number of documents: {len(current_data['document'])}",
-        reply_markup=order_content_keyboard
-    )
-    await CreateOrder.content.set()
+    await enter_content("text", message, state)
 
 
 async def add_photo(callback: types.CallbackQuery):
@@ -156,21 +166,7 @@ async def add_photo(callback: types.CallbackQuery):
 
 
 async def enter_photo(message: types.Message, state: FSMContext):
-    if message.content_type != "photo":
-        await message.answer("You must send photo. Try again!")
-        return
-    current_data = await state.get_data()
-    current_data["photo"] += [message.photo[-1].file_id]
-    await state.update_data(photo=current_data["photo"])
-    await message.answer(
-        f"Number of messages: {len(current_data['message'])}\n"
-        f"Number of photos: {len(current_data['photo'])}\n"
-        f"Number of videos: {len(current_data['video'])}\n"
-        f"Number of audios: {len(current_data['audio'])}\n"
-        f"Number of documents: {len(current_data['document'])}",
-        reply_markup=order_content_keyboard
-    )
-    await CreateOrder.content.set()
+    await enter_content("photo", message, state)
 
 
 async def add_video(callback: types.CallbackQuery):
@@ -179,21 +175,7 @@ async def add_video(callback: types.CallbackQuery):
 
 
 async def enter_video(message: types.Message, state: FSMContext):
-    if message.content_type != "video":
-        await message.answer("You must send video. Try again!")
-        return
-    current_data = await state.get_data()
-    current_data["video"] += [message.video.file_id]
-    await state.update_data(video=current_data["video"])
-    await message.answer(
-        f"Number of messages: {len(current_data['message'])}\n"
-        f"Number of photos: {len(current_data['photo'])}\n"
-        f"Number of videos: {len(current_data['video'])}\n"
-        f"Number of audios: {len(current_data['audio'])}\n"
-        f"Number of documents: {len(current_data['document'])}",
-        reply_markup=order_content_keyboard
-    )
-    await CreateOrder.content.set()
+    await enter_content("video", message, state)
 
 
 async def add_audio(callback: types.CallbackQuery):
@@ -202,21 +184,7 @@ async def add_audio(callback: types.CallbackQuery):
 
 
 async def enter_audio(message: types.Message, state: FSMContext):
-    if message.content_type != "audio":
-        await message.answer("You must send audio. Try again!")
-        return
-    current_data = await state.get_data()
-    current_data["audio"] += [message.audio.file_id]
-    await state.update_data(audio=current_data["audio"])
-    await message.answer(
-        f"Number of messages: {len(current_data['message'])}\n"
-        f"Number of photos: {len(current_data['photo'])}\n"
-        f"Number of videos: {len(current_data['video'])}\n"
-        f"Number of audios: {len(current_data['audio'])}\n"
-        f"Number of documents: {len(current_data['document'])}",
-        reply_markup=order_content_keyboard
-    )
-    await CreateOrder.content.set()
+    await enter_content("audio", message, state)
 
 
 async def add_document(callback: types.CallbackQuery):
@@ -225,21 +193,7 @@ async def add_document(callback: types.CallbackQuery):
 
 
 async def enter_document(message: types.Message, state: FSMContext):
-    if message.content_type != "document":
-        await message.answer("You must send document. Try again!")
-        return
-    current_data = await state.get_data()
-    current_data["document"] += [message.document.file_id]
-    await state.update_data(document=current_data["document"])
-    await message.answer(
-        f"Number of messages: {len(current_data['message'])}\n"
-        f"Number of photos: {len(current_data['photo'])}\n"
-        f"Number of videos: {len(current_data['video'])}\n"
-        f"Number of audios: {len(current_data['audio'])}\n"
-        f"Number of documents: {len(current_data['document'])}",
-        reply_markup=order_content_keyboard
-    )
-    await CreateOrder.content.set()
+    await enter_content("document", message, state)
 
 
 async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMContext):
