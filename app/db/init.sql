@@ -12,5 +12,6 @@ CREATE TABLE IF NOT EXISTS Orders(
     description TEXT NOT NULL,
     price TEXT NOT NULL,
     address TEXT NOT NULL,
+    preview JSON NOT NULL,
     content JSON NOT NULL
 );

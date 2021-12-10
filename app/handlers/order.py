@@ -1,4 +1,4 @@
-# import json
+import json
 
 from aiogram import Dispatcher, types
 from aiogram.dispatcher import FSMContext
@@ -8,7 +8,7 @@ from aiogram.types.message import ContentType
 
 from loguru import logger
 
-from app.keyboards.inline import call_setup_order_keyboard, call_order_categories_keyboard, order_content_keyboard
+from app.keyboards.inline import call_setup_order_keyboard, call_order_categories_keyboard, order_content_keyboard, order_preview_keyboard
 from app.loader import db
 
 order_categories = ["Information", "Documents", "Photos", "Videos", "Location", "Other"]
@@ -21,6 +21,11 @@ class CreateOrder(StatesGroup):
     description = State()
     price = State()
     address = State()
+    preview = State()
+    preview_photo = State()
+    preview_video = State()
+    preview_audio = State()
+    preview_document = State()
     content = State()
     content_message = State()
     content_photo = State()
@@ -46,7 +51,7 @@ async def add_name(callback: types.CallbackQuery):
 
 
 async def enter_name(message: types.Message, state: FSMContext):
-    if len(message.text) > 70:
+    if len(message.text) > 100:
         await message.reply(
             "This name is too long, the maximum is 70 characters.\n"
             "Try again!"
@@ -80,7 +85,7 @@ async def add_description(callback: types.CallbackQuery):
 
 
 async def enter_description(message: types.Message, state: FSMContext):
-    if len(message.text) > 150:
+    if len(message.text) > 350:
         await message.reply(
             "This description is too long, the maximum is 150 characters.\n"
             "Try again!"
@@ -112,19 +117,7 @@ async def enter_address(message: types.Message, state: FSMContext):
     await setup_order(message, state)
 
 
-async def add_content(callback: types.CallbackQuery, state: FSMContext):
-    current_data = await state.get_data()
-    await callback.message.edit_text(
-        "\n".join(
-            f"Number of {content_type}s: {len(current_data['content'][content_type])}"
-            for content_type in current_data['content']
-        ) if 'content' in current_data else "Add content:",
-        reply_markup=order_content_keyboard
-    )
-    await CreateOrder.content.set()
-
-
-async def enter_content(content_type: str, message: types.Message, state: FSMContext, preview=False) -> None:
+async def enter_items(content_type: str, message: types.Message, state: FSMContext, preview=False) -> None:
     if message.content_type != content_type:
         await message.answer(f"You must send {content_type}. Try again!")
     else:
@@ -160,54 +153,114 @@ async def enter_content(content_type: str, message: types.Message, state: FSMCon
                 f"Number of {content_type}s: {len(current_data[prefix][content_type])}"
                 for content_type in current_data[prefix]
             ),
-            reply_markup=order_content_keyboard
+            reply_markup=order_preview_keyboard if preview else order_content_keyboard
         )
-        await state.set_state(CreateOrder.content.state)
+        await state.set_state(CreateOrder.preview.state if preview else CreateOrder.content.state)
 
 
-async def add_message(callback: types.CallbackQuery):
+async def add_preview(callback: types.CallbackQuery, state: FSMContext):
+    current_data = await state.get_data()
+    await callback.message.edit_text(
+        "\n".join(
+            f"Number of {content_type}s: {len(current_data['preview'][content_type])}"
+            for content_type in current_data['preview']
+        ) if 'preview' in current_data else "Add preview files (it is not necessary):\n",
+        reply_markup=order_preview_keyboard
+    )
+    await CreateOrder.preview.set()
+
+
+async def add_preview_photo(callback: types.CallbackQuery):
+    await callback.message.edit_text(f"Add the photo for the order preview")
+    await CreateOrder.preview_photo.set()
+
+
+async def enter_preview_photo(message: types.Message, state: FSMContext):
+    await enter_items("photo", message, state, preview=True)
+
+
+async def add_preview_video(callback: types.CallbackQuery):
+    await callback.message.edit_text(f"Add the video for the order preview")
+    await CreateOrder.preview_video.set()
+
+
+async def enter_preview_video(message: types.Message, state: FSMContext):
+    await enter_items("video", message, state, preview=True)
+
+
+async def add_preview_audio(callback: types.CallbackQuery):
+    await callback.message.edit_text(f"Add the audio for the order preview")
+    await CreateOrder.preview_audio.set()
+
+
+async def enter_preview_audio(message: types.Message, state: FSMContext):
+    await enter_items("audio", message, state, preview=True)
+
+
+async def add_preview_document(callback: types.CallbackQuery):
+    await callback.message.edit_text(f"Add the document for the order preview")
+    await CreateOrder.preview_document.set()
+
+
+async def enter_preview_document(message: types.Message, state: FSMContext):
+    await enter_items("document", message, state, preview=True)
+
+
+async def add_content(callback: types.CallbackQuery, state: FSMContext):
+    current_data = await state.get_data()
+    await callback.message.edit_text(
+        "\n".join(
+            f"Number of {content_type}s: {len(current_data['content'][content_type])}"
+            for content_type in current_data['content']
+        ) if 'content' in current_data else "Add content (you must add at least one item):",
+        reply_markup=order_content_keyboard
+    )
+    await CreateOrder.content.set()
+
+
+async def add_content_message(callback: types.CallbackQuery):
     await callback.message.edit_text(f"Add the comment for the order or the information itself you are going to sell")
     await CreateOrder.content_message.set()
 
 
-async def enter_message(message: types.Message, state: FSMContext):
-    await enter_content("text", message, state)
+async def enter_content_message(message: types.Message, state: FSMContext):
+    await enter_items("text", message, state)
 
 
-async def add_photo(callback: types.CallbackQuery):
+async def add_content_photo(callback: types.CallbackQuery):
     await callback.message.edit_text(f"Add the photo you are going to sell")
     await CreateOrder.content_photo.set()
 
 
-async def enter_photo(message: types.Message, state: FSMContext):
-    await enter_content("photo", message, state)
+async def enter_content_photo(message: types.Message, state: FSMContext):
+    await enter_items("photo", message, state)
 
 
-async def add_video(callback: types.CallbackQuery):
+async def add_content_video(callback: types.CallbackQuery):
     await callback.message.edit_text(f"Add the video you are going to sell")
     await CreateOrder.content_video.set()
 
 
-async def enter_video(message: types.Message, state: FSMContext):
-    await enter_content("video", message, state)
+async def enter_content_video(message: types.Message, state: FSMContext):
+    await enter_items("video", message, state)
 
 
-async def add_audio(callback: types.CallbackQuery):
+async def add_content_audio(callback: types.CallbackQuery):
     await callback.message.edit_text(f"Add the audio you are going to sell")
     await CreateOrder.content_audio.set()
 
 
-async def enter_audio(message: types.Message, state: FSMContext):
-    await enter_content("audio", message, state)
+async def enter_content_audio(message: types.Message, state: FSMContext):
+    await enter_items("audio", message, state)
 
 
-async def add_document(callback: types.CallbackQuery):
+async def add_content_document(callback: types.CallbackQuery):
     await callback.message.edit_text(f"Add the document you are going to sell")
     await CreateOrder.content_document.set()
 
 
-async def enter_document(message: types.Message, state: FSMContext):
-    await enter_content("document", message, state)
+async def enter_content_document(message: types.Message, state: FSMContext):
+    await enter_items("document", message, state)
 
 
 async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMContext):
@@ -216,11 +269,15 @@ async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMConte
         # logger.info(f"{order_data}")
         await db.add_order(callback.from_user.id, **order_data)
         await callback.message.edit_text("Your order has been added")
-        logger.info(await db.get_order(1))
+        # logger.info(await db.get_order(1))
         # content = dict(await db.get_content(1))
         # logger.info(content)
         # content = json.loads((await db.get_content(1))[0])
         # logger.info(content)
+        # preview = dict(await db.get_preview_files(1))
+        # logger.info(preview)
+        # preview = json.loads((await db.get_preview_files(1))[0])
+        # logger.info(preview)
         await state.finish()
     else:
         await callback.message.edit_text(
@@ -244,15 +301,24 @@ def register_order_handlers(dp: Dispatcher):
     dp.register_message_handler(enter_price, state=CreateOrder.price)
     dp.register_callback_query_handler(add_address, Text(equals="address"), state=CreateOrder.order)
     dp.register_message_handler(enter_address, state=CreateOrder.address)
+    dp.register_callback_query_handler(add_preview, Text(equals="preview"), state=CreateOrder.order)
+    dp.register_callback_query_handler(add_preview_photo, Text(equals="photo"), state=CreateOrder.preview)
+    dp.register_message_handler(enter_preview_photo, content_types=ContentType.ANY, state=CreateOrder.preview_photo)
+    dp.register_callback_query_handler(add_preview_video, Text(equals="video"), state=CreateOrder.preview)
+    dp.register_message_handler(enter_preview_video, content_types=ContentType.ANY, state=CreateOrder.preview_video)
+    dp.register_callback_query_handler(add_preview_audio, Text(equals="audio"), state=CreateOrder.preview)
+    dp.register_message_handler(enter_preview_audio, content_types=ContentType.ANY, state=CreateOrder.preview_audio)
+    dp.register_callback_query_handler(add_preview_document, Text(equals="document"), state=CreateOrder.preview)
+    dp.register_message_handler(enter_preview_document, content_types=ContentType.ANY, state=CreateOrder.preview_document)
     dp.register_callback_query_handler(add_content, Text(equals="content"), state=CreateOrder.order)
-    dp.register_callback_query_handler(add_message, Text(equals="message"), state=CreateOrder.content)
-    dp.register_message_handler(enter_message, state=CreateOrder.content_message)
-    dp.register_callback_query_handler(add_photo, Text(equals="photo"), state=CreateOrder.content)
-    dp.register_message_handler(enter_photo, content_types=ContentType.ANY, state=CreateOrder.content_photo)
-    dp.register_callback_query_handler(add_video, Text(equals="video"), state=CreateOrder.content)
-    dp.register_message_handler(enter_video, content_types=ContentType.ANY, state=CreateOrder.content_video)
-    dp.register_callback_query_handler(add_audio, Text(equals="audio"), state=CreateOrder.content)
-    dp.register_message_handler(enter_audio, content_types=ContentType.ANY, state=CreateOrder.content_audio)
-    dp.register_callback_query_handler(add_document, Text(equals="document"), state=CreateOrder.content)
-    dp.register_message_handler(enter_document, content_types=ContentType.ANY, state=CreateOrder.content_document)
+    dp.register_callback_query_handler(add_content_message, Text(equals="message"), state=CreateOrder.content)
+    dp.register_message_handler(enter_content_message, state=CreateOrder.content_message)
+    dp.register_callback_query_handler(add_content_photo, Text(equals="photo"), state=CreateOrder.content)
+    dp.register_message_handler(enter_content_photo, content_types=ContentType.ANY, state=CreateOrder.content_photo)
+    dp.register_callback_query_handler(add_content_video, Text(equals="video"), state=CreateOrder.content)
+    dp.register_message_handler(enter_content_video, content_types=ContentType.ANY, state=CreateOrder.content_video)
+    dp.register_callback_query_handler(add_content_audio, Text(equals="audio"), state=CreateOrder.content)
+    dp.register_message_handler(enter_content_audio, content_types=ContentType.ANY, state=CreateOrder.content_audio)
+    dp.register_callback_query_handler(add_content_document, Text(equals="document"), state=CreateOrder.content)
+    dp.register_message_handler(enter_content_document, content_types=ContentType.ANY, state=CreateOrder.content_document)
     dp.register_callback_query_handler(finish_order_data_setup, Text(equals="save_order"), state=CreateOrder.order)
