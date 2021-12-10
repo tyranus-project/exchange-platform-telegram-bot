@@ -3,7 +3,7 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 def call_setup_order_keyboard(
         name=None, category=None, description=None, price=None, address=None,
-        message=None, photo=None, video=None, audio=None, document=None
+        content=None
 ):
     setup_order_keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -12,7 +12,7 @@ def call_setup_order_keyboard(
             [InlineKeyboardButton(f"{'✔ Description' if description else '➕ Add description'}", callback_data="description")],
             [InlineKeyboardButton(f"{'✔ Price' if price else '➕ Add price'}", callback_data="price")],
             [InlineKeyboardButton(f"{'✔ Address' if address else '➕ Add address'}", callback_data="address")],
-            [InlineKeyboardButton(f"{'✔ Content' if message or photo or video or audio or document else '➕ Add content'}", callback_data="content")],
+            [InlineKeyboardButton(f"{'✔ Content' if content else '➕ Add content'}", callback_data="content")],
             [InlineKeyboardButton("Ok", callback_data="save_order")]
         ]
     )

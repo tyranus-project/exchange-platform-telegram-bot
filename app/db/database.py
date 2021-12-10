@@ -2,7 +2,7 @@ import asyncio
 import asyncpg
 
 from loguru import logger
-
+import json
 
 class Database:
 
@@ -41,20 +41,19 @@ class Database:
             description: str,
             price: str,
             address: str,
-            message: list,
-            photo: list,
-            video: list,
-            audio: list,
-            document: list
+            content: dict
     ) -> None:
         await self.pool.execute(
             '''
-            INSERT INTO Orders(user_id, name, category, description, price, address, message, photo, video, audio, document)
-            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
-            ''', user_id, name, category, description, price, address, message, photo, video, audio, document)
+            INSERT INTO Orders(user_id, name, category, description, price, address, content)
+            VALUES($1, $2, $3, $4, $5, $6, $7)
+            ''', user_id, name, category, description, price, address, json.dumps(content))
         logger.info(f"New order - user_id: {user_id}; order name: {name}")
 
     async def get_order(self, order_id: int):
         response = await self.pool.fetchrow(f"SELECT * FROM Orders WHERE order_id={order_id}")
-        # return True if response else False
+        return response
+
+    async def get_content(self, order_id: int):
+        response = await self.pool.fetchrow(f"SELECT content FROM Orders WHERE order_id=$1", order_id)
         return response

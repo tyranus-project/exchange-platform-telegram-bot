@@ -12,9 +12,5 @@ CREATE TABLE IF NOT EXISTS Orders(
     description TEXT NOT NULL,
     price TEXT NOT NULL,
     address TEXT NOT NULL,
-    message TEXT[] NOT NULL,
-    photo TEXT[] NOT NULL,
-    video TEXT[] NOT NULL,
-    audio TEXT[] NOT NULL,
-    document TEXT[] NOT NULL
+    content JSON NOT NULL
 );

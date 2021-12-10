@@ -1,3 +1,5 @@
+# import json
+
 from aiogram import Dispatcher, types
 from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters import Text
@@ -29,7 +31,6 @@ class CreateOrder(StatesGroup):
 
 async def setup_order(message: types.Message, state: FSMContext):
     if await state.get_state() is None:
-        await state.update_data(message=[], photo=[], video=[], audio=[], document=[])
         await message.answer("Welcome message")
     current_data = await state.get_data()
     await message.answer(
@@ -115,36 +116,49 @@ async def add_content(callback: types.CallbackQuery, state: FSMContext):
     current_data = await state.get_data()
     await callback.message.edit_text(
         "\n".join(
-            f"Number of {content_type}s: {len(current_data[content_type])}"
-            for content_type in ["message", "photo", "video", "audio", "document"]
-        ),
+            f"Number of {content_type}s: {len(current_data['content'][content_type])}"
+            for content_type in current_data['content']
+        ) if 'content' in current_data else "Add content:",
         reply_markup=order_content_keyboard
     )
     await CreateOrder.content.set()
 
 
-async def enter_content(content_type: str, message: types.Message, state: FSMContext) -> None:
+async def enter_content(content_type: str, message: types.Message, state: FSMContext, preview=False) -> None:
     if message.content_type != content_type:
         await message.answer(f"You must send {content_type}. Try again!")
     else:
+        prefix = "preview" if preview else "content"
         current_data = await state.get_data()
+        if prefix not in current_data:
+            current_data[prefix] = {}
         if content_type == "text":
             if len(message.text) == 4096:
                 await message.reply("Please note that this message will be added")
-            current_data["message"] += [message.text]
+            if "message" not in current_data[prefix]:
+                current_data[prefix]["message"] = []
+            current_data[prefix]["message"] += [message.text]
         elif content_type == "photo":
-            current_data["photo"] += [message.photo[-1].file_id]
+            if "photo" not in current_data[prefix]:
+                current_data[prefix]["photo"] = []
+            current_data[prefix]["photo"] += [message.photo[-1].file_id]
         elif content_type == "video":
-            current_data["video"] += [message.video.file_id]
+            if "video" not in current_data[prefix]:
+                current_data[prefix]["video"] = []
+            current_data[prefix]["video"] += [message.video.file_id]
         elif content_type == "audio":
-            current_data["audio"] += [message.audio.file_id]
+            if "audio" not in current_data[prefix]:
+                current_data[prefix]["audio"] = []
+            current_data[prefix]["audio"] += [message.audio.file_id]
         elif content_type == "document":
-            current_data["document"] += [message.document.file_id]
+            if "document" not in current_data[prefix]:
+                current_data[prefix]["document"] = []
+            current_data[prefix]["document"] += [message.document.file_id]
         await state.update_data(current_data)
         await message.answer(
             "\n".join(
-                f"Number of {content_type}s: {len(current_data[content_type])}"
-                for content_type in ["message", "photo", "video", "audio", "document"]
+                f"Number of {content_type}s: {len(current_data[prefix][content_type])}"
+                for content_type in current_data[prefix]
             ),
             reply_markup=order_content_keyboard
         )
@@ -198,17 +212,16 @@ async def enter_document(message: types.Message, state: FSMContext):
 
 async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMContext):
     order_data = await state.get_data()
-    if len(order_data) == 10 and (
-            order_data["message"] or
-            order_data["photo"] or
-            order_data["video"] or
-            order_data["audio"] or
-            order_data["document"]
-    ):
+    if len(order_data) >= 6:
         # logger.info(f"{order_data}")
         await db.add_order(callback.from_user.id, **order_data)
         await callback.message.edit_text("Your order has been added")
         logger.info(await db.get_order(1))
+        # content = dict(await db.get_content(1))
+        # logger.info(content)
+        # content = json.loads((await db.get_content(1))[0])
+        # logger.info(content)
+        await state.finish()
     else:
         await callback.message.edit_text(
             "Not all order data has been entered.\n"
