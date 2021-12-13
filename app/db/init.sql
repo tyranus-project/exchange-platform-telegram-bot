@@ -8,10 +8,10 @@ CREATE TABLE IF NOT EXISTS Orders(
     order_id SERIAL,
     date_time DATE DEFAULT CURRENT_DATE,
     name TEXT NOT NULL,
-    category TEXT NOT NULL,
     description TEXT NOT NULL,
     price TEXT NOT NULL,
     address TEXT NOT NULL,
-    preview JSON NOT NULL,
-    content JSON NOT NULL
+    access TEXT NOT NULL,
+    content JSON NOT NULL,
+    preview JSON
 );

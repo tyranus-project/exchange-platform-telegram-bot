@@ -4,6 +4,7 @@ import asyncpg
 from loguru import logger
 import json
 
+
 class Database:
 
     def __init__(self, name: str, user: str, password: str, host: str, port: str, loop: asyncio.AbstractEventLoop) -> None:
@@ -37,18 +38,18 @@ class Database:
             self,
             user_id: int,
             name: str,
-            category: str,
             description: str,
             price: str,
             address: str,
-            preview: dict,
-            content: dict
+            access: str,
+            content: dict,
+            preview: dict = None
     ) -> None:
         await self.pool.execute(
             '''
-            INSERT INTO Orders(user_id, name, category, description, price, address, preview, content)
+            INSERT INTO Orders(user_id, name, description, price, address, access, content, preview)
             VALUES($1, $2, $3, $4, $5, $6, $7, $8)
-            ''', user_id, name, category, description, price, address, json.dumps(preview), json.dumps(content))
+            ''', user_id, name, description, price, address, access, json.dumps(content), json.dumps(preview))
         logger.info(f"New order - user_id: {user_id}; order name: {name}")
 
     async def get_order(self, order_id: int):

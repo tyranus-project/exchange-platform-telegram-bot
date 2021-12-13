@@ -2,34 +2,31 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 
 def call_setup_order_keyboard(
-        name=None, category=None, description=None, price=None, address=None, preview=None, content=None
-):
+        name=None, description=None, price=None, address=None, access=None, preview=None, content=None
+) -> InlineKeyboardMarkup:
     setup_order_keyboard = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(f"{'✔ Name' if name else '➕ Add name'}", callback_data="name")],
-            [InlineKeyboardButton(f"{'✔ Category' if category else '➕ Add category'}", callback_data="categories")],
             [InlineKeyboardButton(f"{'✔ Description' if description else '➕ Add description'}", callback_data="description")],
             [InlineKeyboardButton(f"{'✔ Price' if price else '➕ Add price'}", callback_data="price")],
             [InlineKeyboardButton(f"{'✔ Address' if address else '➕ Add address'}", callback_data="address")],
-            [InlineKeyboardButton(f"{'✔ Preview' if preview else '➕ Add preview files'}", callback_data="preview")],
+            [InlineKeyboardButton(f"{'✔ Access' if access else '➕ Add access'}", callback_data="access")],
             [InlineKeyboardButton(f"{'✔ Content' if content else '➕ Add content'}", callback_data="content")],
+            [InlineKeyboardButton(f"{'✔ Preview' if preview else '➕ Add preview files'}", callback_data="preview")],
             [InlineKeyboardButton("Ok", callback_data="save_order")]
         ]
     )
     return setup_order_keyboard
 
 
-def call_order_categories_keyboard(order_categories):
-    categories_buttons = [
-        InlineKeyboardButton(f"{category}", callback_data=f"category_{category}") for category in order_categories
+def call_order_access_keyboard(access: str = None) -> InlineKeyboardMarkup:
+    access_buttons = [
+        InlineKeyboardButton(f"{'✔ ' if access == 'public' else ''}Public", callback_data="public_access"),
+        InlineKeyboardButton(f"{'✔ ' if access == 'private' else ''}Private", callback_data="private_access"),
+        InlineKeyboardButton("Back", callback_data="back_setup_order_keyboard")
     ]
-    back_order_setup_keyboard = [
-        InlineKeyboardButton(f"Back", callback_data="back_setup_order_keyboard")
-    ]
-    order_categories_keyboard = InlineKeyboardMarkup(row_width=3)
-    order_categories_keyboard.add(*categories_buttons)
-    order_categories_keyboard.insert(*back_order_setup_keyboard)
-    return order_categories_keyboard
+    order_access_keyboard = InlineKeyboardMarkup(row_width=2).add(*access_buttons)
+    return order_access_keyboard
 
 
 order_preview_keyboard = InlineKeyboardMarkup(
@@ -41,7 +38,6 @@ order_preview_keyboard = InlineKeyboardMarkup(
                 [InlineKeyboardButton("Back", callback_data="back_setup_order_keyboard")]
             ]
         )
-
 
 order_content_keyboard = InlineKeyboardMarkup(
     inline_keyboard=[
