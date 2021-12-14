@@ -1,11 +1,13 @@
 from aiogram import Dispatcher, types
+from aiogram.dispatcher import FSMContext
 from aiogram.dispatcher.filters.builtin import CommandHelp, CommandStart
 
 from app.keyboards.default import main_menu_keyboard
 from app.loader import db
 
 
-async def cmd_start(message: types.Message):
+async def cmd_start(message: types.Message, state: FSMContext):
+    await state.reset_state()
     await message.answer(
         "Welcome!",
         reply_markup=main_menu_keyboard

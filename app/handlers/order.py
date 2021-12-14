@@ -106,9 +106,12 @@ async def add_access(callback: types.CallbackQuery, state: FSMContext):
         "Select the access type for the order.\n"
         "Public - the order will be available in the market for all.\n"
         "Private - the order will be available in the market only after entering a special identifier, "
-        "which you will receive after saving the order.",
-        reply_markup=call_order_access_keyboard(current_data["access"]) if "access" in current_data else call_order_access_keyboard()
+        "which you will receive after saving the order."
     )
+    if "access" in current_data:
+        await callback.message.edit_reply_markup(call_order_access_keyboard(current_data["access"]))
+    else:
+        await callback.message.edit_reply_markup(call_order_access_keyboard())
     await CreateOrder.access.set()
 
 
@@ -167,6 +170,30 @@ async def enter_items(content_type: str, message: types.Message, state: FSMConte
             reply_markup=order_preview_keyboard if preview else order_content_keyboard
         )
         await state.set_state(CreateOrder.preview.state if preview else CreateOrder.content.state)
+
+
+async def reset_items(callback: types.CallbackQuery, state: FSMContext):
+    current_data = await state.get_data()
+    items_category = callback.data.split('_')[1]
+    logger.info(items_category)
+    logger.info(current_data)
+    if items_category in current_data:
+        del current_data[items_category]
+        await state.set_data(current_data)
+        logger.info(current_data)
+        logger.info(await state.get_data())
+        if items_category == "preview":
+            await callback.message.edit_text(
+                "Add preview files (it is not necessary):",
+                reply_markup=order_preview_keyboard
+            )
+        else:
+            await callback.message.edit_text(
+                "Add content (you must add at least one item):",
+                reply_markup=order_content_keyboard
+            )
+    else:
+        await callback.answer()
 
 
 async def add_preview(callback: types.CallbackQuery, state: FSMContext):
@@ -303,7 +330,7 @@ def register_order_handlers(dp: Dispatcher):
     dp.register_message_handler(setup_order, Text(equals="Create order", ignore_case=True))
     dp.register_callback_query_handler(add_name, Text(equals="name"), state=CreateOrder.order)
     dp.register_message_handler(enter_name, state=CreateOrder.name)
-    dp.register_callback_query_handler(back_setup_order, Text(equals="back_setup_order_keyboard"), state=CreateOrder.states_names)
+    dp.register_callback_query_handler(back_setup_order, Text(equals="back"), state=CreateOrder.states_names)
     dp.register_callback_query_handler(add_description, Text(equals="description"), state=CreateOrder.order)
     dp.register_message_handler(enter_description, state=CreateOrder.description)
     dp.register_callback_query_handler(add_price, Text(equals="price"), state=CreateOrder.order)
@@ -321,6 +348,7 @@ def register_order_handlers(dp: Dispatcher):
     dp.register_message_handler(enter_preview_audio, content_types=ContentType.ANY, state=CreateOrder.preview_audio)
     dp.register_callback_query_handler(add_preview_document, Text(equals="document"), state=CreateOrder.preview)
     dp.register_message_handler(enter_preview_document, content_types=ContentType.ANY, state=CreateOrder.preview_document)
+    dp.register_callback_query_handler(reset_items, Text(startswith="reset"), state=CreateOrder.states_names)
     dp.register_callback_query_handler(add_content, Text(equals="content"), state=CreateOrder.order)
     dp.register_callback_query_handler(add_content_message, Text(equals="message"), state=CreateOrder.content)
     dp.register_message_handler(enter_content_message, state=CreateOrder.content_message)

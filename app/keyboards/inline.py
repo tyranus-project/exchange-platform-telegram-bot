@@ -19,13 +19,15 @@ def call_setup_order_keyboard(
     return setup_order_keyboard
 
 
-def call_order_access_keyboard(access: str = None) -> InlineKeyboardMarkup:
+def call_order_access_keyboard(access: str = None, back_button: bool = True) -> InlineKeyboardMarkup:
     access_buttons = [
         InlineKeyboardButton(f"{'✔ ' if access == 'public' else ''}Public", callback_data="public_access"),
-        InlineKeyboardButton(f"{'✔ ' if access == 'private' else ''}Private", callback_data="private_access"),
-        InlineKeyboardButton("Back", callback_data="back_setup_order_keyboard")
+        InlineKeyboardButton(f"{'✔ ' if access == 'private' else ''}Private", callback_data="private_access")
     ]
     order_access_keyboard = InlineKeyboardMarkup(row_width=2).add(*access_buttons)
+    # For possible reuse in market handlers
+    if back_button:
+        order_access_keyboard.add(InlineKeyboardButton("< Back", callback_data="back"))
     return order_access_keyboard
 
 
@@ -35,7 +37,8 @@ order_preview_keyboard = InlineKeyboardMarkup(
                 [InlineKeyboardButton("➕ Add video", callback_data="video")],
                 [InlineKeyboardButton("➕ Add audio", callback_data="audio")],
                 [InlineKeyboardButton("➕ Add document", callback_data="document")],
-                [InlineKeyboardButton("Back", callback_data="back_setup_order_keyboard")]
+                [InlineKeyboardButton("➰ Reset preview files", callback_data="reset_preview")],
+                [InlineKeyboardButton("< Back", callback_data="back")]
             ]
         )
 
@@ -46,6 +49,7 @@ order_content_keyboard = InlineKeyboardMarkup(
             [InlineKeyboardButton("➕ Add video", callback_data="video")],
             [InlineKeyboardButton("➕ Add audio", callback_data="audio")],
             [InlineKeyboardButton("➕ Add document", callback_data="document")],
-            [InlineKeyboardButton("Back", callback_data="back_setup_order_keyboard")]
+            [InlineKeyboardButton("➰ Reset content", callback_data="reset_content")],
+            [InlineKeyboardButton("< Back", callback_data="back")]
         ]
     )
