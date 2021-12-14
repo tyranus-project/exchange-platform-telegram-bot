@@ -6,7 +6,9 @@ from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types.message import ContentType
 
+from loguru import logger
 
+from app.keyboards.default import main_menu_keyboard
 from app.keyboards.inline import call_setup_order_keyboard, call_order_access_keyboard, order_content_keyboard, order_preview_keyboard
 from app.loader import db
 
@@ -32,7 +34,9 @@ class CreateOrder(StatesGroup):
 
 
 async def setup_order(message: types.Message, state: FSMContext):
-    if await state.get_state() is None:
+    current_state = await state.get_state()
+    if current_state not in CreateOrder.states_names:
+        # await state.reset_state()
         await message.answer(
             "Welcome message for create order...",
             reply_markup=types.ReplyKeyboardRemove()
@@ -46,7 +50,7 @@ async def setup_order(message: types.Message, state: FSMContext):
 
 
 async def add_name(callback: types.CallbackQuery):
-    await callback.message.edit_text("Enter order name")
+    await callback.message.edit_text("Enter the name for your order")
     await CreateOrder.name.set()
 
 
@@ -62,7 +66,7 @@ async def enter_name(message: types.Message, state: FSMContext):
 
 
 async def add_description(callback: types.CallbackQuery):
-    await callback.message.edit_text("Enter the description of the order")
+    await callback.message.edit_text("Enter the description for your order")
     await CreateOrder.description.set()
 
 
@@ -78,7 +82,7 @@ async def enter_description(message: types.Message, state: FSMContext):
 
 
 async def add_price(callback: types.CallbackQuery):
-    await callback.message.edit_text("Enter the price of the order")
+    await callback.message.edit_text("Enter the price for your order")
     await CreateOrder.price.set()
 
 
@@ -102,7 +106,7 @@ async def enter_address(message: types.Message, state: FSMContext):
 async def add_access(callback: types.CallbackQuery, state: FSMContext):
     current_data = await state.get_data()
     await callback.message.edit_text(
-        "Select the access type for the order.\n"
+        "Select the access type for your order.\n"
         "Public - the order will be available in the market for all.\n"
         "Private - the order will be available in the market only after entering a special identifier, "
         "which you will receive after saving the order."
@@ -296,18 +300,33 @@ async def enter_content_document(message: types.Message, state: FSMContext):
     await enter_items("document", message, state)
 
 
-async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMContext):
+async def save_order(callback: types.CallbackQuery, state: FSMContext):
     order_data = await state.get_data()
     if len(order_data) >= 6 and "content" in order_data:
         if order_data["access"] == "private":
             order_data["access_token"] = uuid.uuid4()
-            await callback.message.edit_text(
-                "Your order has been saved."
-                "Remember that it is only available by the special identifier below.")
-            await callback.message.answer(order_data["access_token"])
+            await callback.message.edit_text(order_data["access_token"])
+            save_order_answer = (
+                "Your order has been saved.\n"
+                "Remember that it is only available by the special identifier above."
+            )
         else:
-            await callback.message.edit_text("Your order has been saved and is now available in the market.")
-        await db.add_order(callback.from_user.id, **order_data)
+            await callback.message.delete()
+            save_order_answer = "Your order has been saved and is now available in the market."
+        try:
+            await db.add_order(callback.from_user.id, **order_data)
+        except Exception as err:
+            logger.info(err)
+            await callback.message.answer(
+                "Something went wrong.\n"
+                "Try later!",
+                reply_markup=main_menu_keyboard
+            )
+        else:
+            await callback.message.answer(
+                save_order_answer,
+                reply_markup=main_menu_keyboard
+            )
         await state.finish()
     else:
         await callback.message.edit_text(
@@ -315,11 +334,10 @@ async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMConte
             "Add missing by clicking on the buttons:",
             reply_markup=call_setup_order_keyboard(**order_data)
         )
-        return
 
 
 def register_order_handlers(dp: Dispatcher):
-    dp.register_message_handler(setup_order, Text(equals="Create order", ignore_case=True))
+    dp.register_message_handler(setup_order, Text(equals="Create order", ignore_case=True), state="*")
     dp.register_callback_query_handler(add_name, Text(equals="name"), state=CreateOrder.order)
     dp.register_message_handler(enter_name, state=CreateOrder.name)
     dp.register_callback_query_handler(back_setup_order, Text(equals="back"), state=CreateOrder.states_names)
@@ -352,4 +370,4 @@ def register_order_handlers(dp: Dispatcher):
     dp.register_message_handler(enter_content_audio, content_types=ContentType.ANY, state=CreateOrder.content_audio)
     dp.register_callback_query_handler(add_content_document, Text(equals="document"), state=CreateOrder.content)
     dp.register_message_handler(enter_content_document, content_types=ContentType.ANY, state=CreateOrder.content_document)
-    dp.register_callback_query_handler(finish_order_data_setup, Text(equals="save_order"), state=CreateOrder.order)
+    dp.register_callback_query_handler(save_order, Text(equals="save_order"), state=CreateOrder.order)
