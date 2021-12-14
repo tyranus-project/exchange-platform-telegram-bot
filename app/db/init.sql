@@ -13,5 +13,6 @@ CREATE TABLE IF NOT EXISTS Orders(
     address TEXT NOT NULL,
     access TEXT NOT NULL,
     content JSON NOT NULL,
-    preview JSON
+    preview JSON,
+    access_token UUID
 );

@@ -43,13 +43,14 @@ class Database:
             address: str,
             access: str,
             content: dict,
-            preview: dict = None
+            preview: dict = None,
+            access_token: str = None
     ) -> None:
         await self.pool.execute(
             '''
-            INSERT INTO Orders(user_id, name, description, price, address, access, content, preview)
-            VALUES($1, $2, $3, $4, $5, $6, $7, $8)
-            ''', user_id, name, description, price, address, access, json.dumps(content), json.dumps(preview))
+            INSERT INTO Orders(user_id, name, description, price, address, access, content, preview, access_token)
+            VALUES($1, $2, $3, $4, $5, $6, $7, $8, $9)
+            ''', user_id, name, description, price, address, access, json.dumps(content), json.dumps(preview), access_token)
         logger.info(f"New order - user_id: {user_id}; order name: {name}")
 
     async def get_order(self, order_id: int):

@@ -1,4 +1,4 @@
-import json
+import uuid
 
 from aiogram import Dispatcher, types
 from aiogram.dispatcher import FSMContext
@@ -6,7 +6,6 @@ from aiogram.dispatcher.filters import Text
 from aiogram.dispatcher.filters.state import State, StatesGroup
 from aiogram.types.message import ContentType
 
-from loguru import logger
 
 from app.keyboards.inline import call_setup_order_keyboard, call_order_access_keyboard, order_content_keyboard, order_preview_keyboard
 from app.loader import db
@@ -175,13 +174,9 @@ async def enter_items(content_type: str, message: types.Message, state: FSMConte
 async def reset_items(callback: types.CallbackQuery, state: FSMContext):
     current_data = await state.get_data()
     items_category = callback.data.split('_')[1]
-    logger.info(items_category)
-    logger.info(current_data)
     if items_category in current_data:
         del current_data[items_category]
         await state.set_data(current_data)
-        logger.info(current_data)
-        logger.info(await state.get_data())
         if items_category == "preview":
             await callback.message.edit_text(
                 "Add preview files (it is not necessary):",
@@ -303,19 +298,16 @@ async def enter_content_document(message: types.Message, state: FSMContext):
 
 async def finish_order_data_setup(callback: types.CallbackQuery, state: FSMContext):
     order_data = await state.get_data()
-    if len(order_data) >= 6:
-        # logger.info(f"{order_data}")
+    if len(order_data) >= 6 and "content" in order_data:
+        if order_data["access"] == "private":
+            order_data["access_token"] = uuid.uuid4()
+            await callback.message.edit_text(
+                "Your order has been saved."
+                "Remember that it is only available by the special identifier below.")
+            await callback.message.answer(order_data["access_token"])
+        else:
+            await callback.message.edit_text("Your order has been saved and is now available in the market.")
         await db.add_order(callback.from_user.id, **order_data)
-        await callback.message.edit_text("Your order has been added")
-        logger.info(await db.get_order(1))
-        content = dict(await db.get_content(1))
-        logger.info(content)
-        content = json.loads((await db.get_content(1))[0])
-        logger.info(content)
-        preview = dict(await db.get_preview_files(1))
-        logger.info(preview)
-        preview = json.loads((await db.get_preview_files(1))[0])
-        logger.info(preview)
         await state.finish()
     else:
         await callback.message.edit_text(
