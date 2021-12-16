@@ -9,9 +9,11 @@ from aiogram.types.message import ContentType
 from loguru import logger
 
 from app.keyboards.inline import (
-    main_menu_keyboard, market_menu_keyboard,
-    call_create_order_menu_keyboard, call_order_access_keyboard,
-    order_content_keyboard, order_preview_keyboard
+    market_menu_keyboard,
+    call_create_order_menu_keyboard,
+    call_order_access_keyboard,
+    order_content_keyboard,
+    order_preview_keyboard
 )
 from app.loader import db
 
@@ -324,42 +326,38 @@ async def back_market_menu(callback: types.CallbackQuery, state: FSMContext):
 
 
 async def save_order(callback: types.CallbackQuery, state: FSMContext):
-    order_data = await state.get_data()
-    if len(order_data) >= 6 and "content" in order_data:
-        if order_data["access"] == "private":
-            order_data["access_token"] = uuid.uuid4()
-            await callback.message.edit_text(order_data["access_token"])
-            save_order_answer = (
-                "Your order has been saved.\n"
-                "Remember that it is only available by the special identifier above."
-            )
-        else:
-            await callback.message.delete()
-            save_order_answer = "Your order has been saved and is now available in the market."
-        try:
-            await db.add_order(callback.from_user.id, **order_data)
-        except Exception as err:
-            logger.info(err)
-            await callback.message.answer(
-                "Something went wrong.\n"
-                "Try later!",
-                reply_markup=main_menu_keyboard
-            )
-        else:
-            await callback.message.answer(
-                save_order_answer,
-                reply_markup=main_menu_keyboard
-            )
-        await state.finish()
-    else:
-        await callback.message.edit_text(
-            "Not all order data has been entered.\n"
-            "Add missing by clicking on the buttons:",
-            reply_markup=call_create_order_menu_keyboard(**order_data)
+    current_data = await state.get_data()
+    if current_data["access"] == "private":
+        current_data["access_token"] = uuid.uuid4()
+        await callback.message.edit_text(current_data["access_token"])
+        save_order_answer = (
+            "Your order has been saved.\n"
+            "Remember that it is only available with the special identifier sent above and for you in your profile."
         )
+    else:
+        await callback.message.delete()
+        save_order_answer = "Your order has been saved and is now available in the market and for you in your profile."
+    try:
+        await db.add_order(callback.from_user.id, **current_data)
+    except Exception as err:
+        logger.info(err)
+        await callback.message.answer(
+            "Something went wrong.\n"
+            "Try later!",
+            reply_markup=market_menu_keyboard
+        )
+    else:
+        await callback.message.answer(
+            save_order_answer,
+            reply_markup=market_menu_keyboard
+        )
+    finally:
+        await state.finish()
 
 
 def register_order_handlers(dp: Dispatcher):
+
+    # Call Market handlers
     dp.register_message_handler(cmd_market, commands=["market"], state="*")
     dp.register_callback_query_handler(market_button, Text(equals="market"))
 
@@ -367,7 +365,6 @@ def register_order_handlers(dp: Dispatcher):
     dp.register_callback_query_handler(create_order_button, Text(equals="create_order"))
     dp.register_callback_query_handler(add_name, Text(equals="name"), state=CreateOrder.order)
     dp.register_message_handler(enter_name, state=CreateOrder.name)
-    dp.register_callback_query_handler(back_setup_order, Text(equals="back"), state=CreateOrder.states_names)
     dp.register_callback_query_handler(add_description, Text(equals="description"), state=CreateOrder.order)
     dp.register_message_handler(enter_description, state=CreateOrder.description)
     dp.register_callback_query_handler(add_price, Text(equals="price"), state=CreateOrder.order)
@@ -376,6 +373,7 @@ def register_order_handlers(dp: Dispatcher):
     dp.register_message_handler(enter_address, state=CreateOrder.address)
     dp.register_callback_query_handler(add_access, Text(equals="access"), state=CreateOrder.order)
     dp.register_callback_query_handler(select_access, Text(endswith="access"), state=CreateOrder.access)
+    dp.register_callback_query_handler(back_setup_order, Text(equals="back"), state=CreateOrder.states_names)
     dp.register_callback_query_handler(add_preview, Text(equals="preview"), state=CreateOrder.order)
     dp.register_callback_query_handler(add_preview_photo, Text(equals="photo"), state=CreateOrder.preview)
     dp.register_message_handler(enter_preview_photo, content_types=ContentType.ANY, state=CreateOrder.preview_photo)
