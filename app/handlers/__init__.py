@@ -3,7 +3,7 @@ from aiogram import Dispatcher
 from loguru import logger
 
 from .default import register_default_handlers
-from .order import register_order_handlers
+from .market import register_order_handlers
 from .unsupported import register_unsupported_handlers
 
 
