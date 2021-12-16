@@ -8,8 +8,11 @@ from aiogram.types.message import ContentType
 
 from loguru import logger
 
-from app.keyboards.default import main_menu_keyboard
-from app.keyboards.inline import call_setup_order_keyboard, call_order_access_keyboard, order_content_keyboard, order_preview_keyboard
+from app.keyboards.inline import (
+    main_menu_keyboard, market_menu_keyboard,
+    call_create_order_menu_keyboard, call_order_access_keyboard,
+    order_content_keyboard, order_preview_keyboard
+)
 from app.loader import db
 
 
@@ -33,20 +36,35 @@ class CreateOrder(StatesGroup):
     content_document = State()
 
 
-async def setup_order(message: types.Message, state: FSMContext):
+async def cmd_market(message: types.Message, state: FSMContext):
     current_state = await state.get_state()
-    if current_state not in CreateOrder.states_names:
-        # await state.reset_state()
-        await message.answer(
-            "Welcome message for create order...",
-            reply_markup=types.ReplyKeyboardRemove()
-        )
-    current_data = await state.get_data()
+    if current_state:
+        await state.reset_state()
     await message.answer(
-        "Order data:",
-        reply_markup=call_setup_order_keyboard(**current_data)
+        "Market welcome message...",
+        reply_markup=market_menu_keyboard
+    )
+
+
+async def market_button(callback: types.CallbackQuery):
+    await callback.message.edit_text(
+        "Market welcome message...",
+        reply_markup=market_menu_keyboard
+    )
+
+
+async def create_order_menu(message: types.Message, state: FSMContext = None):
+    current_data = await state.get_data() if state else {}
+    await message.answer(
+        "Setting up order data:",
+        reply_markup=call_create_order_menu_keyboard(**current_data)
     )
     await CreateOrder.order.set()
+
+
+async def create_order_button(callback: types.CallbackQuery):
+    await callback.message.edit_text("Welcome message for create order... - Create order info")
+    await create_order_menu(callback.message)
 
 
 async def add_name(callback: types.CallbackQuery):
@@ -62,7 +80,7 @@ async def enter_name(message: types.Message, state: FSMContext):
         )
         return
     await state.update_data(name=message.text)
-    await setup_order(message, state)
+    await create_order_menu(message, state)
 
 
 async def add_description(callback: types.CallbackQuery):
@@ -78,7 +96,7 @@ async def enter_description(message: types.Message, state: FSMContext):
         )
         return
     await state.update_data(description=message.text)
-    await setup_order(message, state)
+    await create_order_menu(message, state)
 
 
 async def add_price(callback: types.CallbackQuery):
@@ -89,7 +107,7 @@ async def add_price(callback: types.CallbackQuery):
 async def enter_price(message: types.Message, state: FSMContext):
     # TODO: Add pattern for price
     await state.update_data(price=message.text)
-    await setup_order(message, state)
+    await create_order_menu(message, state)
 
 
 async def add_address(callback: types.CallbackQuery):
@@ -100,7 +118,7 @@ async def add_address(callback: types.CallbackQuery):
 async def enter_address(message: types.Message, state: FSMContext):
     # TODO: Add pattern for address
     await state.update_data(address=message.text)
-    await setup_order(message, state)
+    await create_order_menu(message, state)
 
 
 async def add_access(callback: types.CallbackQuery, state: FSMContext):
@@ -122,12 +140,12 @@ async def select_access(callback: types.CallbackQuery, state: FSMContext):
     access = callback.data.split('_')[0]
     await state.update_data(access=access)
     await callback.message.edit_text(f"Selected access type: {access}")
-    await setup_order(callback.message, state)
+    await create_order_menu(callback.message, state)
 
 
 async def back_setup_order(callback: types.CallbackQuery, state: FSMContext):
     await callback.message.delete()
-    await setup_order(callback.message, state)
+    await create_order_menu(callback.message, state)
 
 
 async def enter_items(content_type: str, message: types.Message, state: FSMContext, preview=False) -> None:
@@ -300,6 +318,11 @@ async def enter_content_document(message: types.Message, state: FSMContext):
     await enter_items("document", message, state)
 
 
+async def back_market_menu(callback: types.CallbackQuery, state: FSMContext):
+    await state.reset_state()
+    await market_button(callback)
+
+
 async def save_order(callback: types.CallbackQuery, state: FSMContext):
     order_data = await state.get_data()
     if len(order_data) >= 6 and "content" in order_data:
@@ -332,12 +355,16 @@ async def save_order(callback: types.CallbackQuery, state: FSMContext):
         await callback.message.edit_text(
             "Not all order data has been entered.\n"
             "Add missing by clicking on the buttons:",
-            reply_markup=call_setup_order_keyboard(**order_data)
+            reply_markup=call_create_order_menu_keyboard(**order_data)
         )
 
 
 def register_order_handlers(dp: Dispatcher):
-    dp.register_message_handler(setup_order, Text(equals="Create order", ignore_case=True), state="*")
+    dp.register_message_handler(cmd_market, commands=["market"], state="*")
+    dp.register_callback_query_handler(market_button, Text(equals="market"))
+
+    # Create order handlers
+    dp.register_callback_query_handler(create_order_button, Text(equals="create_order"))
     dp.register_callback_query_handler(add_name, Text(equals="name"), state=CreateOrder.order)
     dp.register_message_handler(enter_name, state=CreateOrder.name)
     dp.register_callback_query_handler(back_setup_order, Text(equals="back"), state=CreateOrder.states_names)
@@ -370,4 +397,7 @@ def register_order_handlers(dp: Dispatcher):
     dp.register_message_handler(enter_content_audio, content_types=ContentType.ANY, state=CreateOrder.content_audio)
     dp.register_callback_query_handler(add_content_document, Text(equals="document"), state=CreateOrder.content)
     dp.register_message_handler(enter_content_document, content_types=ContentType.ANY, state=CreateOrder.content_document)
+
+    # Navigation handlers
+    dp.register_callback_query_handler(back_market_menu, Text(equals="back_market_menu"), state=CreateOrder.order)
     dp.register_callback_query_handler(save_order, Text(equals="save_order"), state=CreateOrder.order)
